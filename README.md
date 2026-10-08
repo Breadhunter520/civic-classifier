@@ -4,7 +4,7 @@ A self-taught computer vision project: a model that looks at a car photo and dec
 
 Built with **Keras 3 on the PyTorch backend**, trained on a laptop GPU (RTX 4050, 6 GB).
 
-![Detect every car, then check each one](images/detect_then_classify.jpg)
+![Detect every car, then check each one](detect_then_classify.jpg)
 *My own street photo: YOLO finds each vehicle, then my Civic model checks each box (green = Civic). Number plates are blurred.*
 
 ---
@@ -32,10 +32,10 @@ The 43-photo test set is small, so treat these numbers as a progress check, not 
 - Split: 528 training / 99 validation / 97 test. Plus a separate **fresh test set of 43 new photos**, used only to compare models.
 
 ### 2. Five model versions, one change at a time
-![Accuracy of each model version on the same 43 unseen photos](images/model_evolution.png)
+![Accuracy of each model version on the same 43 unseen photos](model_evolution.png)
 
 - All models use **transfer learning**: start from a network pretrained on ImageNet, train a new head first (backbone frozen), then fine-tune the last blocks with a small learning rate.
-  ![Training curves: stage 1 frozen backbone, stage 2 fine-tuning](images/training_curves_two_stages.png)
+  ![Training curves: stage 1 frozen backbone, stage 2 fine-tuning](training_curves_two_stages.png)
 - **Adding more photos alone did not help** (86% → 86%).
 - **A stronger backbone and higher resolution did** (ConvNeXt-Tiny → EfficientNetV2-B0 → V2-S, 224 → 384 px). At 224 px the small details that separate a Civic from an Accord get squeezed away.
 - Fitting EfficientNetV2-S at 384 px on a 6 GB GPU meant batch size 4 and keeping some layers frozen.
@@ -43,11 +43,11 @@ The 43-photo test set is small, so treat these numbers as a progress check, not 
 ### 3. Checking *what* the model looks at (Grad-CAM was misleading)
 Grad-CAM on my own street photo pointed at the boot lid centre, not at the 10th-gen's distinctive "claw" tail lights:
 
-![Grad-CAM heatmap pointing at the boot lid](images/gradcam_misleading.png)
+![Grad-CAM heatmap pointing at the boot lid](gradcam_misleading.png)
 
 So I ran an **occlusion (cover) test**: hide one part at a time with a grey box and watch the score.
 
-![Cover test: hiding the claw lights drops the score, hiding the spoiler does nothing](images/cover_test_tail_lights.png)
+![Cover test: hiding the claw lights drops the score, hiding the spoiler does nothing](cover_test_tail_lights.png)
 
 - Covering the right claw light: **0.999 → 0.41**. Both lights: **0.095**. Covering the boot centre that Grad-CAM highlighted: **no change**.
 - The model **does** rely on the tail lights. Grad-CAM only showed the single strongest spot.
@@ -56,7 +56,7 @@ So I ran an **occlusion (cover) test**: hide one part at a time with a grey box 
 ### 4. Testing on real streets → adding object detection
 The test photos mostly show one big car. On my own street photo with several cars, the Civic is small, and the model said **"not Civic"**. Squeezing the whole street into 384 × 384 makes the Civic tiny.
 
-![Whole photo vs YOLO crop](images/whole_photo_vs_yolo_crop.png)
+![Whole photo vs YOLO crop](whole_photo_vs_yolo_crop.png)
 
 Fix: **detect first, then classify.**
 1. A pretrained **YOLOv8n** detector (Ultralytics, COCO) finds every car, truck and bus.
@@ -72,13 +72,13 @@ To run without PyTorch, Keras or Ultralytics (for a small free server), I export
 
 ## Known weaknesses (and what I'd do next)
 - **Local cars it never saw**: Perodua, Proton models and vans can be wrongly scored as Civic, because the "not Civic" photos came from web searches of other sedans. Next: add photos of these as negatives and retrain.
-- **No "I don't know" answer**: random noise scores 89% "Civic". The detector in front prevents this in practice.
+- **No "I don't know" answer**: the model can only answer "Civic" or "not Civic". Given a photo of random noise (something it never saw), it still has to choose, and it said 89% "Civic". In the demo, the detector checks for a car first, so the Civic model is only asked about real cars.
 - **Small test set** (43 photos): good for comparing versions, too small for a precise accuracy number.
 - Next learning steps: train my own detector on hand-labelled Civic boxes, then semantic segmentation.
 
 ## What's not in this repo (and why)
 - **The training photos**: they were downloaded from the web and belong to their owners. The download and filtering approach is described above.
-- **The model files**: kept private. Happy to share for an interview.
+- **The model files**: the model is still being improved (e.g. with local Malaysian cars), so I don't publish a version that will soon be outdated. Happy to share it for a job interview.
 
 ---
 
