@@ -11,7 +11,8 @@
   body { margin:0; background:var(--bg); color:var(--text); font:16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
   main { max-width:860px; margin:0 auto; padding:28px 16px 48px; }
   h1 { font-size:28px; margin:0 0 4px; }
-  .sub { color:var(--muted); margin:0 0 20px; }
+  .sub { color:var(--muted); margin:0 0 12px; }
+  .note { margin:0 0 20px; padding:10px 12px; border-left:3px solid var(--accent); background:var(--card); border-radius:0 8px 8px 0; font-size:14px; color:var(--muted); }
   #drop { border:2px dashed var(--line); border-radius:14px; background:var(--card); padding:36px 16px; text-align:center; cursor:pointer; color:var(--muted); }
   #drop.over { border-color:var(--accent); color:var(--accent); }
   #status { margin:16px 0 8px; font-weight:600; min-height:1.5em; }
@@ -29,6 +30,7 @@
 <main>
   <h1>Civic Checker</h1>
   <p class="sub">Drop a car photo. The app finds every vehicle and checks which ones are a <b>10th-gen Honda Civic</b> (2016–2021).</p>
+  <p class="note"><b>Work in progress:</b> very accurate on photos where one car fills most of the picture. On busy street photos (cars far away, many local models such as Perodua and Proton) it can still mistake other cars for a Civic, and I'm improving that next.</p>
 
   <div id="drop" tabindex="0" role="button" aria-label="Choose a photo">
     <b>Drag &amp; drop a photo here</b>, or tap to choose one<br>

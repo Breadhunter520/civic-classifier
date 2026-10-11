@@ -11,7 +11,7 @@ Tested against the original Ultralytics + Keras version: identical boxes and sco
                  each = 4 box numbers + 80 class scores
   3. cleanup     keep car / bus / truck >= 40%, then NMS (keep the surest box, delete boxes
                  overlapping it by more than 70%, repeat)
-  4. crop        each car box + 10% margin, squashed to 384 x 384 like the training photos
+  4. crop        each car box + 10% margin, squashed to 384 x 384 like training (PAD_CROPS=1 pads to a square first)
   5. Civic       civic.onnx -> one score per car, > 0.5 = 10th-gen Civic
 """
 import os
@@ -23,6 +23,7 @@ from PIL import Image
 HERE = os.path.dirname(os.path.abspath(__file__))
 VEHICLES = {2: "car", 5: "bus", 7: "truck"}   # COCO class numbers -> names
 MIN_CONF, NMS_IOU, MIN_SIDE = 0.4, 0.7, 40      # same settings as civic_detect.py / Ultralytics defaults
+PAD_CROPS = os.environ.get("PAD_CROPS", "0") == "1"   # off: padding fixed the street Civic but made unknown local cars score higher (11z-10)
 CIVIC_SIZE, YOLO_SIZE = 384, 640
 
 MODEL_REPO = "Breadhunter/civic-fc-classifier"   # private Hugging Face model page
@@ -126,8 +127,19 @@ def detect_vehicles(img):
     return out
 
 
+def pad_to_square(crop, colour=(127, 127, 127)):
+    """Put the crop in the middle of a grey square, so squashing to 384 x 384 doesn't stretch it.
+    A side-on street car can be 2.5 : 1 wide; squashing that made it look tall and dropped a real
+    Civic from 88% to 65%. On the 43 test photos: pad 41/43 vs squash 40/43 (civic notes 11z-10)."""
+    w, h = crop.size
+    side = max(w, h)
+    square = Image.new("RGB", (side, side), colour)
+    square.paste(crop, ((side - w) // 2, (side - h) // 2))
+    return square
+
+
 def find_civics(img):
-    """Every vehicle YOLO finds (big enough) -> crop with 10% margin -> Civic score."""
+    """Every vehicle YOLO finds (big enough) -> crop with 10% margin -> (optionally pad to a square) -> Civic score."""
     img = img.convert("RGB")
     W, H = img.size
     cars = []
@@ -136,7 +148,7 @@ def find_civics(img):
             continue
         mx, my = 0.10 * (x1 - x0), 0.10 * (y1 - y0)
         crop = img.crop((max(0, x0 - mx), max(0, y0 - my), min(W, x1 + mx), min(H, y1 + my)))
-        cars.append({"box": (x0, y0, x1, y1), "yolo": name, "yolo_conf": conf, "civic": civic_score(crop)})
+        cars.append({"box": (x0, y0, x1, y1), "yolo": name, "yolo_conf": conf, "civic": civic_score(pad_to_square(crop) if PAD_CROPS else crop)})
     return cars
 
 
