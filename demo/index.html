@@ -15,6 +15,14 @@
   .note { margin:0 0 20px; padding:10px 12px; border-left:3px solid var(--accent); background:var(--card); border-radius:0 8px 8px 0; font-size:14px; color:var(--muted); }
   #drop { border:2px dashed var(--line); border-radius:14px; background:var(--card); padding:36px 16px; text-align:center; cursor:pointer; color:var(--muted); }
   #drop.over { border-color:var(--accent); color:var(--accent); }
+  #drop.busy { opacity:.5; cursor:wait; }
+  #busy { display:none; align-items:center; gap:10px; margin:16px 0 0; color:var(--muted); }
+  #busy.on { display:flex; }
+  .spin { width:18px; height:18px; border:3px solid var(--line); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  .bar { flex:1; height:6px; background:var(--line); border-radius:3px; overflow:hidden; }
+  .bar i { display:block; height:100%; width:30%; background:var(--accent); border-radius:3px; animation:slide 1.2s ease-in-out infinite; }
+  @keyframes slide { 0% { margin-left:-30%; } 100% { margin-left:100%; } }
   #status { margin:16px 0 8px; font-weight:600; min-height:1.5em; }
   canvas { width:100%; height:auto; border-radius:12px; display:none; background:#000; }
   .cars { list-style:none; padding:0; margin:12px 0 0; }
@@ -38,6 +46,7 @@
     <input id="file" type="file" accept="image/*" hidden>
   </div>
 
+  <div id="busy"><span class="spin"></span><span id="busytext">Checking…</span><span class="bar"><i></i></span></div>
   <div id="status" aria-live="polite"></div>
   <canvas id="view"></canvas>
   <ul class="cars" id="cars"></ul>
@@ -59,25 +68,41 @@
 const drop = document.getElementById("drop"), file = document.getElementById("file");
 const statusEl = document.getElementById("status"), canvas = document.getElementById("view");
 const list = document.getElementById("cars"), wholeEl = document.getElementById("whole");
+const busy = document.getElementById("busy"), busyText = document.getElementById("busytext");
+let working = false, timer = null;
 
-drop.addEventListener("click", () => file.click());
-drop.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); file.click(); } });
+// one photo at a time: while a photo is being checked, new photos are ignored
+function setBusy(on) {
+  working = on; drop.classList.toggle("busy", on); busy.classList.toggle("on", on); drop.setAttribute("aria-disabled", on);
+  clearInterval(timer);
+  if (on) {
+    const t0 = Date.now();
+    const tick = () => { const s = Math.round((Date.now() - t0) / 1000);
+      busyText.textContent = s < 8 ? `Checking… ${s}s` : `Checking… ${s}s (the free server may be waking up, this can take up to a minute)`; };
+    tick(); timer = setInterval(tick, 1000);
+  }
+}
+
+drop.addEventListener("click", () => { if (!working) file.click(); });
+drop.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !working) { e.preventDefault(); file.click(); } });
 drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
 drop.addEventListener("dragleave", () => drop.classList.remove("over"));
 drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) check(e.dataTransfer.files[0]); });
 file.addEventListener("change", () => { if (file.files[0]) check(file.files[0]); file.value = ""; });
 
 async function check(f) {
+  if (working) return;
   if (!f.type.startsWith("image/")) { statusEl.textContent = "Please choose a photo (JPG or PNG)."; return; }
   list.innerHTML = ""; wholeEl.textContent = "";
-  statusEl.textContent = "Checking… (the first check can take about a minute while the server wakes up)";
+  statusEl.textContent = ""; setBusy(true);
   const body = new FormData(); body.append("photo", f);
   let res;
   try {
     const r = await fetch("/predict", { method: "POST", body });
     res = await r.json();
     if (!r.ok) throw new Error(res.detail || "Something went wrong.");
-  } catch (err) { statusEl.textContent = "Error: " + err.message; return; }
+  } catch (err) { setBusy(false); statusEl.textContent = "Error: " + err.message; return; }
+  setBusy(false);
   await draw(f, res);
 }
 
